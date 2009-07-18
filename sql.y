@@ -1,6 +1,6 @@
 %{
 #include <stdio.h>
-#include <string.h>
+#include "schemaUpdate.h"
 #define YYSTYPE char*
 
 void yyerror(const char* message) {
@@ -9,10 +9,6 @@ void yyerror(const char* message) {
 
 int yywrap() {
 	return 1;
-}
-
-int main() {
-	yyparse();
 }
 
 %}
@@ -39,12 +35,12 @@ statement:
 
 create_statement:
 	CREATE TABLE garbage tableName LPAREN columnList RPAREN {
-		printf("Creating Table \"%s\"\n", $4);
+		newTable($4);
 	}
 
 insert_statement:
 	INSERT INTO tableName VALUES LPAREN valueList RPAREN {
-		printf("Inserted Into Table \"%s\"\n", $3);
+		newRow($3);
 	}
 
 unknown_statement:
@@ -88,11 +84,11 @@ columnList:
 
 columnValue:
 	WORD garbage {
-		printf("Column: %s\n", $1);
+		newColumn($1);
 	}
 	|
 	WORD garbage LPAREN garbage RPAREN {
-		printf("Column: %s\n", $1);
+		newColumn($1);
 	}
 	;
 
@@ -103,11 +99,19 @@ valueList:
 	;
 
 value:
-	NUMBER
+	NUMBER {
+		newValue($1);
+	}
 	|
-	WORD
+	WORD {
+		newValue($1);
+	}
 	|
-	SQL_NULL
+	SQL_NULL {
+		newValue("NULL");
+	}
 	|
-	STRING
+	STRING {
+		newValue($1);
+	}
 	;
