@@ -1,0 +1,32 @@
+SQL Schema Updater
+
+So, what this is meant to do basically is this:
+
+Say you had a SQL dump from some DB.
+It looks like this:
+CREATE TABLE someData(column1 TEXT, column2 TEXT, column3 TEXT);
+INSERT INTO someData VALUES ('LALA', 'SAVES', 'THE DAY');
+INSERT INTO someData VALUES ('Woah', 'Nelly', 'Settle Down');
+
+Let's say you wanted to change the schema of that DB to this:
+CREATE TABLE someData(column1, column3, column4);
+
+Then you would run
+schemaUpdate thatNewSchema.sql < theDump.sql
+
+and it would spit out
+INSERT INTO someData(column1, column3) VALUES ('LALA', 'THE DAY');
+INSERT INTO someData(column1, column3) VALUES ('Woah', 'Settle Down');
+
+Not terribly exciting, but it would work.
+It has preserved all the data it could fit into this new DB.
+
+
+Obviously this doesn't work if you're adding primary keys, or restraints of any kind.
+It might simplify it, though.
+It'd give you all that it can, then leave the rest up to you to do manually.
+
+Also, it goes on strict names.
+It doesn't deal in renamed columns, or renamed tables.
+Again, though, it does the best it can.
+You could easily modify its output by hand after, if you like.
