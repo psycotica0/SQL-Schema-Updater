@@ -4,6 +4,7 @@
 #include "schemaUpdate.h"
 
 int yyparse();
+extern FILE* yyin;
 
 Node* Tables=NULL;
 Node* TempValues=NULL;
@@ -75,7 +76,7 @@ SqlTable* getTable(char* name, int oldOrNew) {
 	Node* head=Tables;
 
 	while (head != NULL) {
-		if (head->value != NULL) {
+		if (head->value != NULL && ((SqlTable*)head->value)->name != NULL) {
 			if (strcmp(((SqlTable*)head->value)->name, name) == 0 && ((SqlTable*)head->value)->oldNew == oldOrNew) {
 				return (SqlTable*)head->value;
 			}
@@ -93,6 +94,7 @@ SqlRow* filterRow(Node* listOfValues, SqlTable* filterThrough) {
 	SqlRow* temp = malloc(sizeof(SqlRow));
 	temp->values = NULL;
 	temp->table = filterThrough;
+	if (filterThrough == NULL) return temp;
 
 	while (head != NULL) {
 		Node* column = filterThrough->values;
@@ -113,6 +115,7 @@ SqlRow* filterRow(Node* listOfValues, SqlTable* filterThrough) {
 
 /* This prints a row */
 void printRow(SqlRow* row) {
+	if (row->table == NULL) return;
 	printf("INSERT INTO %s (", row->table->name);
 	Node* head = row->values;
 	while (head != NULL) {
@@ -134,12 +137,17 @@ void printRow(SqlRow* row) {
 }
 
 int newColumn(char* column) {
-	appendChain(&(getCurrentTable()->values), strdup(column));
+	SqlTable* current = getCurrentTable();
+	if (current->name != NULL) {
+		/* We've already filled this one */
+		appendChain(&Tables, tableAllocator());
+		current = getCurrentTable();
+	}
+	appendChain(&(current->values), strdup(column));
 }
 
 int newTable(char* table) {
 	getCurrentTable()->name = strdup(table);
-	appendChain(&Tables, tableAllocator());
 }
 
 int newValue(char* value) {
@@ -150,21 +158,39 @@ int newValue(char* value) {
 
 int newRow(char* row) {
 	SqlTable* table = getTable(row, 0);
-	Node* head = TempValues;
-	Node* columns = table->values;
+	if (table != NULL) {
+		Node* head = TempValues;
+		Node* columns = table->values;
 
-	while (head != NULL) {
-		((SqlValue*)head->value)->columnName = columns->value;
-		head = head->next;
-		columns = columns->next;
+		while (head != NULL) {
+			((SqlValue*)head->value)->columnName = columns->value;
+			head = head->next;
+			columns = columns->next;
+		}
+
+		printRow(filterRow(TempValues, getTable(row, 1)));
 	}
-
-	printRow(filterRow(TempValues, table));
-
 	/* XXX: THIS IS CLEARLY NOT GOOD MEMORY MANAGEMENT */
 	TempValues = NULL;
 }
 
-int main() {
+int main(int argc, char** argv) {
+	/* Read in the New schema */
+	oldOrNew = 1;
+	if (argc <= 1) {
+		fputs("Expecting Filename Of New Schema.\n", stderr);
+		return 1;
+	}
+
+	FILE* newSchema = fopen(argv[1], "r");
+	yyin = newSchema;
 	yyparse();
+	close(newSchema);
+
+	/* Now the old data */
+	oldOrNew = 0;
+	yyin = stdin;
+	yyparse();
+
+	return 0;
 }
