@@ -42,6 +42,13 @@ void* tableAllocator() {
 	return temp;
 }
 
+void* valueAllocator() {
+	SqlValue* temp = malloc(sizeof(SqlValue));
+	temp->columnName = NULL;
+	temp->value = NULL;
+	return temp;
+}
+
 /* This adds a new item onto the end of a chain */
 void appendChain(Node** head, void* value) {
 	Node* last = getTail(head);
@@ -63,6 +70,69 @@ SqlTable* getCurrentTable() {
 	return (SqlTable*)getLastValue(&Tables, &tableAllocator);
 }
 
+/* This function find an old or new table of a given name */
+SqlTable* getTable(char* name, int oldOrNew) {
+	Node* head=Tables;
+
+	while (head != NULL) {
+		if (head->value != NULL) {
+			if (strcmp(((SqlTable*)head->value)->name, name) == 0 && ((SqlTable*)head->value)->oldNew == oldOrNew) {
+				return (SqlTable*)head->value;
+			}
+		}
+		head = head->next;
+	}
+
+	return NULL;
+}
+
+/* This command takes in the list of values and only outputs the data that has a column in filterThrough */
+SqlRow* filterRow(Node* listOfValues, SqlTable* filterThrough) {
+	Node* head = listOfValues;
+
+	SqlRow* temp = malloc(sizeof(SqlRow));
+	temp->values = NULL;
+	temp->table = filterThrough;
+
+	while (head != NULL) {
+		Node* column = filterThrough->values;
+		while (column != NULL) {
+			if (head->value != NULL && column->value != NULL) {
+				if (strcmp(((SqlValue*)head->value)->columnName, column->value) == 0) {
+					/* In Both */
+					appendChain(&(temp->values), head->value);
+				}
+			}
+			column = column->next;
+		}
+		head = head->next;
+	}
+
+	return temp;
+}
+
+/* This prints a row */
+void printRow(SqlRow* row) {
+	printf("INSERT INTO %s (", row->table->name);
+	Node* head = row->values;
+	while (head != NULL) {
+		printf("%s", ((SqlValue*)head->value)->columnName);
+		head = head->next;
+		if (head != NULL) printf(", ");
+	}
+
+	printf(") VALUES (");
+
+	head = row->values;
+	while (head != NULL) {
+		printf("%s", ((SqlValue*)head->value)->value);
+		head = head->next;
+		if (head != NULL) printf(", ");
+	}
+
+	printf(");\n");
+}
+
 int newColumn(char* column) {
 	appendChain(&(getCurrentTable()->values), strdup(column));
 }
@@ -73,29 +143,28 @@ int newTable(char* table) {
 }
 
 int newValue(char* value) {
-	printf("Value: %s\n", value);
+	SqlValue* temp = valueAllocator();
+	appendChain(&TempValues, temp);
+	temp->value = strdup(value);
 }
 
 int newRow(char* row) {
-	printf("Row: %s\n", row);
-}
+	SqlTable* table = getTable(row, 0);
+	Node* head = TempValues;
+	Node* columns = table->values;
 
-void printTable(SqlTable* table) {
-	printf("CREATE TABLE %s(", table->name);
-	Node* head = table->values;
 	while (head != NULL) {
-		printf(" %s", head->value);
+		((SqlValue*)head->value)->columnName = columns->value;
 		head = head->next;
-		if (head != NULL) printf(",");
+		columns = columns->next;
 	}
-	printf(");\n");
+
+	printRow(filterRow(TempValues, table));
+
+	/* XXX: THIS IS CLEARLY NOT GOOD MEMORY MANAGEMENT */
+	TempValues = NULL;
 }
 
 int main() {
 	yyparse();
-	Node* head=Tables;
-	while (head != NULL) {
-		printTable(head->value);
-		head = head->next;
-	}
 }
